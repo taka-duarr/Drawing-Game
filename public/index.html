@@ -1,0 +1,792 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="style.css">
+    <title>Drawing Game</title>
+
+</head>
+<body>
+
+    <div id="notification-container"></div>
+    <div class="container">
+        <!-- Lobby Screen -->
+        <div id="lobby" class="screen active">
+            <h1>🎨 Drawing Game</h1>
+            <div class="input-group">
+                <input type="text" id="username" placeholder="Enter your username" maxlength="20">
+            </div>
+            <div class="input-group">
+                <button onclick="createRoom()">Create Room</button>
+                <span style="margin: 0 10px;">or</span>
+                <input type="text" id="roomCode" placeholder="Room code" maxlength="6">
+                <button onclick="joinRoom()">Join Room</button>
+            </div>
+        </div>
+
+        <!-- Room Screen -->
+        <div id="room" class="screen">
+            <h2>Room: <span id="roomIdDisplay"></span></h2>
+            <div id="playersList"></div>
+            <div class="input-group">
+                <button id="startGameBtn" onclick="startGame()" disabled>Start Game</button>
+            </div>
+        </div>
+
+        <!-- Game Screen -->
+        <div id="game" class="screen">
+            <div id="drawing-area">
+                <canvas id="canvas"></canvas>
+                <div class="tools">
+                    <button class="tool color-tool" style="background: black;" onclick="changeColor('black')"></button>
+                    <button class="tool color-tool" style="background: red;" onclick="changeColor('red')"></button>
+                    <button class="tool color-tool" style="background: blue;" onclick="changeColor('blue')"></button>
+                    <button class="tool color-tool" style="background: green;" onclick="changeColor('green')"></button>
+                    <button class="tool" onclick="changeBrushSize(2)">Small</button>
+                    <button class="tool" onclick="changeBrushSize(5)">Medium</button>
+                    <button class="tool" onclick="changeBrushSize(10)">Large</button>
+                    <button class="tool" onclick="clearCanvas()">Clear</button>
+                </div>
+            </div>
+            
+                    <!-- Dalam #game-info, tambahkan tombol Leave -->
+            <div id="game-info">
+                <h3>Game Info</h3>
+                <div style="display: flex; gap: 10px; margin-bottom: 15px;">
+                    <button onclick="leaveGame()" style="background: #ff6b6b;">Leave Game</button>
+                </div>
+                <div id="wordHint"></div>
+                <div id="players-list"></div>
+                
+                <div id="chat-messages"></div>
+                <div class="input-group">
+                    <input type="text" id="chatInput" placeholder="Type your guess..." style="flex-grow: 1;">
+                    <button onclick="sendMessage()">Send</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+       class DrawingGame {
+    constructor() {
+        this.ws = null;
+        this.playerId = null;
+        this.roomId = null;
+        this.isDrawing = false;
+        this.canvas = null;
+        this.ctx = null;
+        this.currentColor = 'black';
+        this.brushSize = 5;
+        
+        // FIX: Simplified drawing state management
+        this.isCurrentlyDrawing = false;
+        this.lastX = 0;
+        this.lastY = 0;
+        
+        this.init();
+    }
+
+    init() {
+        this.setupCanvas();
+        this.showScreen('lobby');
+        this.disableDrawing();
+    }
+
+    showNotification(message, type = 'info') {
+        const container = document.getElementById('notification-container');
+        
+        // Buat elemen notifikasi
+        const toast = document.createElement('div');
+        toast.className = `toast ${type}`;
+        toast.textContent = message;
+        
+        // Tambahkan ke layar
+        container.appendChild(toast);
+        
+        // Hapus otomatis setelah 3 detik
+        setTimeout(() => {
+            toast.style.animation = 'fadeOut 0.3s ease-in forwards';
+            setTimeout(() => {
+                if (container.contains(toast)) {
+                    container.removeChild(toast);
+                }
+            }, 300); // Tunggu animasi fadeOut selesai
+        }, 3000); // Muncul selama 3 detik
+    }
+
+    setupCanvas() {
+        this.canvas = document.getElementById('canvas');
+        this.ctx = this.canvas.getContext('2d');
+        
+        // Set canvas size
+        const drawingArea = document.getElementById('drawing-area');
+        this.canvas.width = drawingArea.offsetWidth;
+        this.canvas.height = drawingArea.offsetHeight;
+
+        // Initialize canvas dengan background putih
+        this.clearCanvas();
+        
+        // Set default drawing styles
+        this.ctx.strokeStyle = this.currentColor;
+        this.ctx.lineWidth = this.brushSize;
+        this.ctx.lineCap = 'round';
+        this.ctx.lineJoin = 'round';
+
+        // Drawing event listeners
+        this.canvas.addEventListener('mousedown', this.startDrawing.bind(this));
+        this.canvas.addEventListener('mousemove', this.draw.bind(this));
+        this.canvas.addEventListener('mouseup', this.stopDrawing.bind(this));
+        this.canvas.addEventListener('mouseout', this.stopDrawing.bind(this));
+
+        // Touch events for mobile
+        this.canvas.addEventListener('touchstart', this.handleTouchStart.bind(this));
+        this.canvas.addEventListener('touchmove', this.handleTouchMove.bind(this));
+        this.canvas.addEventListener('touchend', this.stopDrawing.bind(this));
+    }
+
+    handleTouchStart(e) {
+        e.preventDefault();
+        const touch = e.touches[0];
+        const mouseEvent = new MouseEvent('mousedown', {
+            clientX: touch.clientX,
+            clientY: touch.clientY
+        });
+        this.canvas.dispatchEvent(mouseEvent);
+    }
+
+    handleTouchMove(e) {
+        e.preventDefault();
+        const touch = e.touches[0];
+        const mouseEvent = new MouseEvent('mousemove', {
+            clientX: touch.clientX,
+            clientY: touch.clientY
+        });
+        this.canvas.dispatchEvent(mouseEvent);
+    }
+
+    connectWebSocket() {
+        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const wsUrl = `${protocol}//${window.location.host}`;
+        
+        this.ws = new WebSocket(wsUrl);
+        
+        this.ws.onopen = () => {
+            console.log('✅ Connected to server');
+        };
+
+        this.ws.onmessage = (event) => {
+            try {
+                const message = JSON.parse(event.data);
+                console.log('📨 Received:', message.type, message.data);
+                this.handleMessage(message);
+            } catch (error) {
+                console.error('❌ Error parsing message:', error);
+            }
+        };
+
+        this.ws.onclose = () => {
+            console.log('🔌 Disconnected from server');
+            alert('Disconnected from server');
+            this.showScreen('lobby');
+        };
+
+        this.ws.onerror = (error) => {
+            console.error('💥 WebSocket error:', error);
+        };
+    }
+
+    handleMessage(message) {
+        const { type, data } = message;
+
+        switch (type) {
+            case 'room_created':
+                this.handleRoomCreated(data);
+                break;
+
+            case 'room_joined':
+                this.handleRoomJoined(data);
+                break;
+
+            case 'player_joined':
+                this.updatePlayersList(data.players);
+                this.showNotification(`${data.username} joined the game!`, 'info');
+                break;
+
+            case 'player_left':
+                this.handlePlayerLeft(data);
+                if(data.username) this.showNotification(`${data.username} left the game`, 'warning');
+                break;
+
+            case 'game_started':
+                this.handleGameStarted(data);
+                break;
+
+            case 'new_round':
+                this.handleNewRound(data);
+                this.showNotification(`Round ${data.round} Started!`, 'info');
+                break;
+
+            case 'you_are_drawing':
+                this.handleYouAreDrawing(data);
+                this.showNotification(`GILIRANMU! Gambar: ${data.word}`, 'success');
+                break;
+
+            case 'draw':
+                this.handleDraw(data);
+                break;
+
+            case 'chat_message':
+                this.addChatMessage(data);
+                break;
+
+            case 'correct_guess':
+                this.handleCorrectGuess(data);
+                this.addChatMessage({
+                            username: 'System', 
+                            message: `🎉 ${data.username} Menjawab Benar! (+100pts) | 🎨 ${data.drawerName} (+50pts)`, 
+                            type: 'correct'
+                });
+                this.showNotification(`🎉 ${data.username} Benar!`, 'success');
+                break;
+
+            case 'clear_canvas':
+                this.handleClearCanvas();
+                break;
+
+            case 'players_update':
+                this.updatePlayersList(data.players);
+                break;
+
+            case 'error':
+                console.error('Server error:', data);
+                alert('Error: ' + data);
+                break;
+
+            case 'left_game':
+                this.handleLeftGame(data);
+                this.showNotification("You left the game", 'error');
+                break;
+            case 'you_are_host':
+            this.handleYouAreHost(data);
+            break;
+            case 'game_over':
+            this.handleGameOver(data);
+            break;
+
+            default:
+                console.log('❓ Unknown message type:', type);
+        }
+    }
+
+    handlePlayerLeft(data) {
+    console.log(`👋 Player left: ${data.username}`);
+    this.updatePlayersList(data.players || []);
+    this.addSystemMessage(`${data.username} left the game`);
+    
+    // Jika tidak ada players lagi, kembali ke lobby
+    if (!data.players || data.players.length === 0) {
+        this.showScreen('lobby');
+        this.resetGameState();
+    }
+    }
+
+    handleRoomCreated(data) {
+        this.playerId = data.playerId;
+        this.roomId = data.roomId;
+        this.showRoomScreen();
+        this.updatePlayersList([{
+            id: data.playerId,
+            username: data.username,
+            score: 0,
+            isDrawing: false,
+            isHost: true
+        }]);
+    }
+
+    handleRoomJoined(data) {
+        this.playerId = data.playerId;
+        this.roomId = data.roomId;
+        this.showRoomScreen();
+    }
+
+    handleGameStarted(data) {
+        console.log('🎮 Game started!');
+        this.showGameScreen();
+        this.addSystemMessage('Game started! Get ready...');
+
+         // --- Tambahan agar tombol start hilang ---
+    const btn = document.getElementById('startGameBtn');
+    if (btn) btn.style.display = "none";
+    }
+
+    handleGameOver(data) {
+
+    this.showNotification(`🏆 ${data.winner} MENANG DENGAN ${data.score} POIN!`, "success");
+
+    // Tambahkan juga pesan system ke chat
+    this.addSystemMessage(`🏆 ${data.winner} memenangkan permainan dengan ${data.score} poin!`);
+
+    // Kembali ke lobby
+    this.resetGameState();
+    this.showScreen('lobby');
+}
+
+
+    handleNewRound(data) {
+        console.log('🔄 New round started:', data);
+        this.clearCanvas();
+        this.isDrawing = false;
+        
+        const wordHint = document.getElementById('wordHint');
+        wordHint.innerHTML = `
+            <h4>Round ${data.round}</h4>
+            <p><strong>Drawer:</strong> ${data.drawer.username}</p>
+            <p><strong>Hint:</strong> ${data.hint}</p>
+            <p><strong>Length:</strong> ${data.wordLength} letters</p>
+            ${data.difficulty ? `<p><strong>Difficulty:</strong> ${data.difficulty}</p>` : ''}
+        `;
+
+        // Enable/disable drawing based on who's drawer
+        if (this.playerId === data.drawer.playerId) {
+            this.enableDrawing();
+            this.addSystemMessage('🎨 You are drawing! Other players will guess your word.');
+        } else {
+            this.disableDrawing();
+            this.addSystemMessage(`🎨 ${data.drawer.username} is drawing. Start guessing!`);
+        }
+
+        this.updatePlayersList(data.players || []);
+    }
+
+    handleYouAreDrawing(data) {
+        console.log('🎨 You are drawing:', data.word);
+        this.isDrawing = true;
+        this.enableDrawing();
+        
+        const wordHint = document.getElementById('wordHint');
+        const existingContent = wordHint.innerHTML;
+        wordHint.innerHTML = existingContent + `
+            <p style="color: #4CAF50; font-weight: bold; margin-top: 10px;">
+                ✏️ Your word: "${data.word}"
+            </p>
+        `;
+    }
+
+    // FIX: Simplified and reliable drawing method
+     handleDraw(data) {
+        if (!this.ctx) return;
+        
+        const x = data.x;
+        const y = data.y;
+        const size = data.size || 5;
+        const color = data.color || 'black';
+
+        // ALWAYS draw as individual dots - NO lineTo AT ALL
+        this.ctx.fillStyle = color;
+        this.ctx.beginPath();
+        
+        // Draw circle/dot
+        this.ctx.arc(x, y, size / 2, 0, Math.PI * 2);
+        this.ctx.fill();
+        
+        console.log('🔵 Drawing dot at:', x, y, 'size:', size);
+    }
+
+    handleClearCanvas() {
+        this.clearCanvas();
+    }
+
+    handleLeftGame(data) {
+    console.log('🚪 Left game:', data.message);
+    this.showScreen('lobby');
+    this.addSystemMessage(data.message);
+    this.resetGameState();
+}
+
+handleYouAreHost(data) {
+    console.log('👑 You are now the host');
+    alert('You are now the host of the room!');
+    // Enable start button jika di room screen
+    const startBtn = document.getElementById('startGameBtn');
+    if (startBtn) {
+        startBtn.disabled = false;
+    }
+}
+
+// Method untuk reset state
+resetGameState() {
+    this.playerId = null;
+    this.roomId = null;
+    this.isDrawing = false;
+    this.isCurrentlyDrawing = false;
+    
+    if (this.drawingInterval) {
+        clearInterval(this.drawingInterval);
+        this.drawingInterval = null;
+    }
+    
+    // Clear canvas
+    this.clearCanvas();
+    
+    // Reset UI elements
+    const playersList = document.getElementById('playersList') || document.getElementById('players-list');
+    if (playersList) playersList.innerHTML = '';
+    
+    const chatMessages = document.getElementById('chat-messages');
+    if (chatMessages) chatMessages.innerHTML = '';
+    
+    const wordHint = document.getElementById('wordHint');
+    if (wordHint) wordHint.innerHTML = '';
+}
+
+
+
+    handleCorrectGuess(data) {
+        this.addChatMessage({
+            username: 'System',
+            message: `🎉 ${data.username} guessed the word "${data.word}" correctly! +100 points!`,
+            type: 'correct'
+        });
+    }
+
+    enableDrawing() {
+        this.isDrawing = true;
+        
+        // Aktifkan interaksi canvas
+        this.canvas.style.cursor = 'crosshair';
+        this.canvas.style.pointerEvents = 'auto';
+        this.canvas.classList.remove('disabled');
+
+        // --- TAMPILKAN TOOLBAR ---
+        const tools = document.querySelector('.tools');
+        if (tools) {
+            tools.style.display = 'flex'; // Munculkan tools
+        }
+    }
+
+    disableDrawing() {
+        this.isDrawing = false;
+        this.isCurrentlyDrawing = false; // Stop drawing jika sedang drag
+        
+        // Matikan interaksi canvas
+        this.canvas.style.cursor = 'not-allowed';
+        this.canvas.style.pointerEvents = 'none';
+        this.canvas.classList.add('disabled');
+
+        // --- SEMBUNYIKAN TOOLBAR ---
+        const tools = document.querySelector('.tools');
+        if (tools) {
+            tools.style.display = 'none'; // Hilangkan tools
+        }
+    }
+
+    // FIX: Simplified drawing methods
+   startDrawing(e) {
+    if (!this.isDrawing) return;
+    
+    this.isCurrentlyDrawing = true;
+    
+    const rect = this.canvas.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    
+    // FIX: Simpan posisi awal untuk drawing
+    this.lastX = x;
+    this.lastY = y;
+    
+    // FIX: Kirim action 'start' bukan 'draw' untuk titik awal
+    this.sendDrawData(x, y, 'start');
+    
+    // FIX: Jangan draw dot di local, biarkan server yang handle
+    // this.drawDot(x, y, this.currentColor, this.brushSize); // HAPUS BARIS INI
+    
+    console.log('🎨 Start drawing at:', x, y);
+}
+
+    draw(e) {
+        if (!this.isCurrentlyDrawing || !this.isDrawing) return;
+
+        const rect = this.canvas.getBoundingClientRect();
+        const x = e.clientX - rect.left;
+        const y = e.clientY - rect.top;
+
+        // Draw dot at current position
+        this.drawDot(x, y, this.currentColor, this.brushSize);
+        
+        // Send drawing data
+        this.sendDrawData(x, y, 'draw');
+    }
+
+    // Helper method untuk draw dots
+    drawDot(x, y, color, size) {
+        this.ctx.fillStyle = color;
+        this.ctx.beginPath();
+        this.ctx.arc(x, y, size / 2, 0, Math.PI * 2);
+        this.ctx.fill();
+    }
+
+    stopDrawing() {
+        if (!this.isCurrentlyDrawing) return;
+        
+        this.isCurrentlyDrawing = false;
+        console.log('🛑 Stop drawing');
+    }
+
+    sendDrawData(x, y, action = 'draw') {
+        if (this.ws && this.ws.readyState === WebSocket.OPEN && this.isDrawing) {
+            const drawData = {
+                x: x, 
+                y: y, 
+                color: this.currentColor, 
+                size: this.brushSize,
+                action: action
+            };
+            
+            this.ws.send(JSON.stringify({
+                type: 'draw',
+                data: drawData
+            }));
+        }
+    }
+
+    clearCanvas() {
+        if (!this.ctx) return;
+        
+        // Clear dengan background putih
+        this.ctx.fillStyle = 'white';
+        this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+        
+        // Reset drawing state
+        this.ctx.strokeStyle = this.currentColor;
+        this.ctx.lineWidth = this.brushSize;
+        this.ctx.beginPath();
+        
+        console.log('🧹 Canvas cleared');
+    }
+
+    // Chat methods
+    addChatMessage(messageData) {
+        const chat = document.getElementById('chat-messages');
+        const messageDiv = document.createElement('div');
+        
+        messageDiv.className = `message ${messageData.type || 'normal'}`;
+        messageDiv.innerHTML = `
+            <strong>${messageData.username}:</strong> ${messageData.message}
+            ${messageData.timestamp ? `<br><small>${new Date(messageData.timestamp).toLocaleTimeString()}</small>` : ''}
+        `;
+        
+        chat.appendChild(messageDiv);
+        chat.scrollTop = chat.scrollHeight;
+    }
+
+    addSystemMessage(message) {
+        this.addChatMessage({
+            username: 'System',
+            message: message,
+            type: 'system'
+        });
+    }
+
+    updatePlayersList(players) {
+        const playersList = document.getElementById('playersList') || document.getElementById('players-list');
+        if (!playersList) return;
+
+        playersList.innerHTML = '';
+
+        players.forEach(player => {
+            const playerDiv = document.createElement('div');
+            playerDiv.className = `player ${player.isDrawing ? 'drawing' : ''}`;
+            playerDiv.innerHTML = `
+                <span>${player.username} ${player.isHost ? '👑' : ''}</span>
+                <span>${player.score || 0} pts</span>
+                ${player.isDrawing ? '<span>✏️</span>' : ''}
+            `;
+            playersList.appendChild(playerDiv);
+        });
+    }
+
+    removePlayer(playerId) {
+        console.log(`Player ${playerId} left`);
+    }
+
+    showScreen(screenName) {
+        document.querySelectorAll('.screen').forEach(screen => {
+            screen.classList.remove('active');
+        });
+        document.getElementById(screenName).classList.add('active');
+    }
+
+    showRoomScreen() {
+        this.showScreen('room');
+        document.getElementById('roomIdDisplay').textContent = this.roomId;
+        
+        const startBtn = document.getElementById('startGameBtn');
+        if (startBtn) {
+            startBtn.disabled = false;
+        }
+    }
+
+    showGameScreen() {
+        this.showScreen('game');
+        setTimeout(() => {
+            const drawingArea = document.getElementById('drawing-area');
+            if (this.canvas && drawingArea) {
+                this.canvas.width = drawingArea.offsetWidth;
+                this.canvas.height = drawingArea.offsetHeight;
+                this.clearCanvas();
+            }
+        }, 100);
+    }
+
+    sendMessage(type, data) {
+        if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+            this.ws.send(JSON.stringify({ type, data }));
+        } else {
+            console.error('WebSocket not connected');
+        }
+    }
+}
+
+        // Global functions for HTML buttons
+        const game = new DrawingGame();
+
+        function createRoom() {
+            const username = document.getElementById('username').value.trim();
+            if (!username) {
+                alert('Please enter a username');
+                return;
+            }
+
+            game.connectWebSocket();
+            // Wait for connection to establish
+            setTimeout(() => {
+                game.sendMessage('create_room', { username });
+            }, 500);
+        }
+
+        function leaveGame() {
+            if (confirm("Are you sure you want to leave the game?")) {
+                if (game.ws && game.ws.readyState === WebSocket.OPEN) {
+                    game.sendMessage('leave_game', {});
+                } else {
+                    // Fallback jika WebSocket tidak tersedia
+                    game.showScreen('lobby');
+                    resetGameState();
+                }
+            }
+        }
+
+        function resetGameState() {
+            game.playerId = null;
+            game.roomId = null;
+            game.isDrawing = false;
+            game.isCurrentlyDrawing = false;
+            
+            // Clear canvas
+            if (game.ctx) {
+                game.clearCanvas();
+            }
+            
+            // Reset UI
+            document.getElementById('playersList').innerHTML = '';
+            document.getElementById('players-list').innerHTML = '';
+            document.getElementById('chat-messages').innerHTML = '';
+            document.getElementById('wordHint').innerHTML = '';
+            
+            console.log('🔄 Game state reset');
+        }
+
+        function leaveRoom() {
+            if (confirm("Are you sure you want to leave the room?")) {
+                if (game.ws) {
+                    game.ws.close();
+                }
+                resetGameState();
+                game.showScreen('lobby');
+            }
+        }
+
+
+        function joinRoom() {
+            const username = document.getElementById('username').value.trim();
+            const roomCode = document.getElementById('roomCode').value.trim().toUpperCase();
+
+            if (!username || !roomCode) {
+                alert('Please enter both username and room code');
+                return;
+            }
+
+            game.connectWebSocket();
+            // Wait for connection to establish
+            setTimeout(() => {
+                game.sendMessage('join_room', { roomId: roomCode, username });
+            }, 500);
+        }
+
+       function startGame() {
+            const btn = document.getElementById('startGameBtn');
+            if (btn) btn.style.display = "none";   // ← Sembunyikan tombol
+
+            game.sendMessage('start_game', {});
+        }
+
+
+        function sendMessage() {
+            const input = document.getElementById('chatInput');
+            const message = input.value.trim();
+            
+            if (message && game.ws) {
+                game.sendMessage('chat_message', { message });
+                input.value = '';
+            }
+        }
+
+        // Drawing tools
+        function changeColor(color) {
+            game.currentColor = color;
+            // Update active color indicator
+            document.querySelectorAll('.color-tool').forEach(tool => {
+                tool.style.borderColor = 'white';
+            });
+            event.target.style.borderColor = '#ff9800';
+        }
+
+        function changeBrushSize(size) {
+            game.brushSize = size;
+            // Update active brush size indicator
+            document.querySelectorAll('.tool').forEach(tool => {
+                if (tool.textContent.includes('Small') || tool.textContent.includes('Medium') || tool.textContent.includes('Large')) {
+                    tool.classList.remove('active');
+                }
+            });
+            event.target.classList.add('active');
+        }
+
+        function clearCanvas() {
+            game.clearCanvas();
+            if (game.isDrawing) {
+                game.sendMessage('clear_canvas', {});
+            }
+        }
+
+        // Enter key for chat
+        document.getElementById('chatInput')?.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                sendMessage();
+            }
+        });
+
+        // Handle window resize
+        window.addEventListener('resize', () => {
+            if (game.canvas) {
+                const drawingArea = document.getElementById('drawing-area');
+                game.canvas.width = drawingArea.offsetWidth;
+                game.canvas.height = drawingArea.offsetHeight;
+                game.clearCanvas();
+            }
+        });
+    </script>
+</body>
+</html>
