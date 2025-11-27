@@ -9,11 +9,10 @@ const serviceAccount = require("./serviceAccountKey.json");
 
 admin.initializeApp({
   credential: admin.credential.cert(serviceAccount),
-  databaseURL: "https://drawing-game-app-default-rtdb.firebaseio.com/", // Ganti dengan URL database Anda
+  databaseURL: "https://drawing-game-app-default-rtdb.firebaseio.com/",
 });
 
-// Gunakan Realtime Database (bukan Firestore)
-const db = admin.database(); // ← PERUBAHAN PENTING
+const db = admin.database();
 
 const app = express();
 const server = http.createServer(app);
@@ -82,9 +81,6 @@ async function handleWebSocketMessage(ws, message) {
   }
 }
 
-// Update existing leaveRoom function
-
-
 async function startGame(ws, data) {
   const roomId = ws.roomId;
 
@@ -136,7 +132,6 @@ async function startGame(ws, data) {
     setupRealtimeListeners(roomId);
 
     // Broadcast game started
-    // --- FIX: Broadcast list pemain ke semua client setelah start game ---
     broadcastToRoom(roomId, {
       type: "players_update",
       data: {
