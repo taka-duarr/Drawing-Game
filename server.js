@@ -172,7 +172,11 @@ async function startNewRound(roomId) {
     const room = activeRooms.get(roomId);
     if (!room) return;
 
+    room.roundAnswered = false;
+    room.roundActive = true;
+
     const words = [
+
       { word: "apel", difficulty: "easy" },
       { word: "bola", difficulty: "easy" },
       { word: "buku", difficulty: "easy" },
@@ -181,21 +185,110 @@ async function startNewRound(roomId) {
       { word: "gelas", difficulty: "easy" },
       { word: "bintang", difficulty: "easy" },
 
-      { word: "rumah", difficulty: "medium" },
-      { word: "mobil", difficulty: "medium" },
-      { word: "pohon", difficulty: "medium" },
-      { word: "payung", difficulty: "medium" },
-      { word: "sepatu", difficulty: "medium" },
-      { word: "gitar", difficulty: "medium" },
-      { word: "jam", difficulty: "medium" },
+      { word: "gunting", difficulty: "medium" },
+      { word: "camera", difficulty: "medium" },
+      { word: "pisang", difficulty: "medium" },
+      { word: "roti", difficulty: "medium" },
+      { word: "tas", difficulty: "medium" },
+      { word: "pintu", difficulty: "medium" },
+      { word: "kue", difficulty: "medium" },
+      { word: "kapal", difficulty: "medium" },
+      { word: "kursi", difficulty: "medium" },
+      { word: "topi", difficulty: "medium" },
+      { word: "boneka", difficulty: "medium" },
+      { word: "sendok", difficulty: "medium" },
+      { word: "garpu", difficulty: "medium" },
+      { word: "obor", difficulty: "medium" },
+      { word: "kuda", difficulty: "medium" },
+      { word: "serigala", difficulty: "medium" },
+      { word: "domba", difficulty: "medium" },
+      { word: "singa", difficulty: "medium" },
+      { word: "robot", difficulty: "medium" },
+      { word: "televisi", difficulty: "medium" },
 
-      { word: "komputer", difficulty: "hard" },
-      { word: "sepeda", difficulty: "hard" },
-      { word: "pesawat", difficulty: "hard" },
-      { word: "gajah", difficulty: "hard" },
-      { word: "kupu-kupu", difficulty: "hard" },
-      { word: "pantai", difficulty: "hard" },
+      { word: "menara", difficulty: "hard" },
+      { word: "jembatan", difficulty: "hard" },
+      { word: "helm astronot", difficulty: "hard" },
+      { word: "kereta api", difficulty: "hard" },
+      { word: "gorila", difficulty: "hard" },
+      { word: "kamera CCTV", difficulty: "hard" },
+      { word: "teropong", difficulty: "hard" },
+      { word: "zombie", difficulty: "hard" },
+      { word: "naga", difficulty: "hard" },
+      { word: "pulau", difficulty: "hard" },
+      { word: "kompor gas", difficulty: "hard" },
+      { word: "studio musik", difficulty: "hard" },
+      { word: "sampan", difficulty: "hard" },
+      { word: "jendela kaca", difficulty: "hard" },
+      { word: "papan selancar", difficulty: "hard" },
+      { word: "satelit", difficulty: "hard" },
+      { word: "karpet terbang", difficulty: "hard" },
+      { word: "otak manusia", difficulty: "hard" },
+      { word: "penyihir", difficulty: "hard" },
+      { word: "kapak", difficulty: "hard" },
+      { word: "rumah sakit", difficulty: "hard" },
+      { word: "malam hari", difficulty: "hard" },
+      { word: "tangga darurat", difficulty: "hard" },
+      { word: "kotak harta karun", difficulty: "hard" },
+      { word: "kepala suku", difficulty: "hard" },
+      { word: "drum band", difficulty: "hard" },
+      { word: "kincir angin", difficulty: "hard" },
+      { word: "suku pedalaman", difficulty: "hard" },
+      { word: "labirin", difficulty: "hard" },
+      { word: "mesin waktu", difficulty: "hard" },
+      { word: "tong sampah", difficulty: "hard" },
+      { word: "pramugari", difficulty: "hard" },
+      { word: "monster laut", difficulty: "hard" },
+      { word: "kabut tebal", difficulty: "hard" },
+      { word: "hutan gelap", difficulty: "hard" },
+      { word: "ban motor", difficulty: "hard" },
+      { word: "gembok", difficulty: "hard" },
+      { word: "lemari es", difficulty: "hard" },
+      { word: "lilin meleleh", difficulty: "hard" },
+      { word: "kecanduan game", difficulty: "hard" },
+
+      { word: "kapal selam", difficulty: "very hard" },
+      { word: "feniks", difficulty: "very hard" },
+      { word: "meteor jatuh", difficulty: "very hard" },
+      { word: "dimensi portal", difficulty: "very hard" },
+      { word: "pengendali petir", difficulty: "very hard" },
+      { word: "mesin pembelah atom", difficulty: "very hard" },
+      { word: "perpustakaan kuno", difficulty: "very hard" },
+      { word: "pirates vs kraken", difficulty: "very hard" },
+      { word: "kerajaan bawah laut", difficulty: "very hard" },
+      { word: "istana es", difficulty: "very hard" },
+      { word: "perang laser", difficulty: "very hard" },
+      { word: "tornado api", difficulty: "very hard" },
+      { word: "patung kolosal", difficulty: "very hard" },
+      { word: "pionir bulan", difficulty: "very hard" },
+      { word: "robot raksasa", difficulty: "very hard" },
+      { word: "serangga mekanik", difficulty: "very hard" },
+      { word: "monster hutan", difficulty: "very hard" },
+      { word: "rumah berhantu", difficulty: "very hard" },
+      { word: "kapal alien", difficulty: "very hard" },
+      { word: "singgasana emas", difficulty: "very hard" },
+      { word: "kuil terkutuk", difficulty: "very hard" },
+      { word: "badai salju", difficulty: "very hard" },
+      { word: "penjaga gerbang neraka", difficulty: "very hard" },
+      { word: "kubah kaca raksasa", difficulty: "very hard" },
+      { word: "markas rahasia", difficulty: "very hard" },
+      { word: "pulau tenggelam", difficulty: "very hard" },
+      { word: "mesin perang kuno", difficulty: "very hard" },
+      { word: "sungai lava", difficulty: "very hard" },
+      { word: "taman labirin raksasa", difficulty: "very hard" },
+      { word: "kota cyberpunk", difficulty: "very hard" },
+      { word: "menara sihir", difficulty: "very hard" },
+      { word: "pohon raksasa", difficulty: "very hard" },
+      { word: "prajurit bayangan", difficulty: "very hard" },
+      { word: "drone pemantau", difficulty: "very hard" },
+      { word: "penyihir api", difficulty: "very hard" },
+      { word: "koloni mars", difficulty: "very hard" },
+      { word: "kereta hantu", difficulty: "very hard" },
+      { word: "temple guardian", difficulty: "very hard" },
+      { word: "dimensi astral", difficulty: "very hard" },
+      { word: "raja naga", difficulty: "very hard" },
     ];
+
 
     if (words.length === 0) {
       console.error("No words found");
@@ -206,17 +299,19 @@ async function startNewRound(roomId) {
 
     // Select random drawer
     const players = Array.from(room.players.values());
-    let drawer;
 
-    // If there was a previous drawer, try to pick someone else
-    const previousDrawer = room.drawer;
-    const availablePlayers = players.filter((p) => p !== previousDrawer);
+    // Inisialisasi jika belum ada
+    if (room.drawerIndex === undefined) room.drawerIndex = 0;
 
-    if (availablePlayers.length > 0) {
-      drawer = availablePlayers[Math.floor(Math.random() * availablePlayers.length)];
-    } else {
-      drawer = players[Math.floor(Math.random() * players.length)];
-    }
+    // Reset jika sudah sampai akhir
+    if (room.drawerIndex >= players.length) room.drawerIndex = 0;
+
+    // Tentukan drawer berdasarkan urutan pemain
+    const drawer = players[room.drawerIndex];
+
+    // Untuk ronde berikutnya
+    room.drawerIndex++;
+
 
     // Reset drawing status for all players
     room.players.forEach((player) => {
@@ -605,6 +700,28 @@ async function handleCorrectGuess(ws, roomId, username) {
   try {
     const room = activeRooms.get(roomId);
     if (!room) return;
+
+    if (room.roundAnswered) {
+      console.log(
+        `⚠️ Ignored late correct guess by ${username} in room ${roomId}`
+      );
+      // Opsional: kirim notifikasi kecil ke player yang terlambat
+      ws.send(
+        JSON.stringify({
+          type: "chat_message",
+          data: {
+            username: "System",
+            message: "Jawaban diterima tapi sudah terlambat.",
+            type: "system",
+            timestamp: Date.now(),
+          },
+        })
+      );
+      return;
+    }
+
+    room.roundAnswered = true;
+    room.roundActive = false;
 
     const WINNING_SCORE = 1000;
     const GUESSER_POINTS = 100;
