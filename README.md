@@ -1,6 +1,4 @@
-Tentu, ini adalah file `README.md` yang sudah diformat dengan rapi menggunakan Markdown, siap untuk Anda salin dan gunakan di repositori GitHub atau dokumentasi proyek Anda.
 
-````markdown
 # 🎨 Multiplayer Drawing Game – Real-Time WebSocket + Firebase
 
 Sebuah game menggambar multiplayer real-time (mirip Gartic.io), dibangun menggunakan **Node.js**, **WebSocket**, dan **Firebase Realtime Database**. Game ini memungkinkan pemain untuk membuat ruangan, bergiliran menggambar kata, dan menebak gambar pemain lain untuk mendapatkan skor.
