@@ -381,35 +381,6 @@ function getPlayerIdByWS(playersMap, ws) {
   return null;
 }
 
-// Tambahkan juga function untuk handle kata dari database
-async function getRandomWord() {
-  try {
-    // Jika Anda ingin menyimpan words di Realtime Database
-    const wordsRef = db.ref('words');
-    const snapshot = await wordsRef.once('value');
-    const words = snapshot.val();
-    
-    if (words) {
-      const wordKeys = Object.keys(words);
-      const randomKey = wordKeys[Math.floor(Math.random() * wordKeys.length)];
-      return words[randomKey];
-    }
-    
-    // Fallback ke default words jika tidak ada di database
-    return {
-      word: ["apple", "banana", "cat", "dog", "house", "car"][Math.floor(Math.random() * 6)],
-      difficulty: "easy"
-    };
-  } catch (error) {
-    console.error("Error getting random word:", error);
-    // Fallback
-    return {
-      word: "apple",
-      difficulty: "easy"
-    };
-  }
-}
-
 async function createRoom(ws, data) {
   const { username } = data;
 
@@ -700,7 +671,7 @@ async function handleCorrectGuess(ws, roomId, username) {
       console.log(
         `⚠️ Ignored late correct guess by ${username} in room ${roomId}`
       );
-      // Opsional: kirim notifikasi kecil ke player yang terlambat
+      // kirim notifikasi kecil ke player yang terlambat
       ws.send(
         JSON.stringify({
           type: "chat_message",
@@ -1126,5 +1097,3 @@ server.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);
   console.log(`🔥 Connected to Firebase Realtime Database`);  
 });
-
-//

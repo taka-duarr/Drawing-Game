@@ -78,7 +78,7 @@ Ikuti langkah berikut untuk menjalankan game di komputer lokal:
 ### 1️⃣ Clone Repository
 
 ```bash
-git clone [https://github.com/username/drawing-game.git](https://github.com/username/drawing-game.git)
+git clone [https://github.com/taka-duarr/Drawing-Game.git)
 cd drawing-game
 ```
 
